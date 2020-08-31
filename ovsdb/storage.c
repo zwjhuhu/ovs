@@ -483,8 +483,8 @@ static void
 schedule_next_snapshot(struct ovsdb_storage *storage, bool quick)
 {
     if (storage->log || storage->raft) {
-        unsigned int base = 10 * 60 * 1000;  /* 10 minutes */
-        unsigned int range = 10 * 60 * 1000; /* 10 minutes */
+        unsigned int base = 1 * 60 * 1000;  /* 1 minutes */
+        unsigned int range = 1 * 60 * 1000; /* 1 minutes */
         if (quick) {
             base /= 10;
             range /= 10;

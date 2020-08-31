@@ -1103,6 +1103,9 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             ARRAY_SIZE(filt), (struct sock_filter *) filt
         };
 
+        unsigned int sock_buf_size = (1 << 30) - 1;
+        unsigned int sock_opt_len = sizeof(sock_buf_size);
+
         /* Create file descriptor. */
         rx->fd = socket(PF_PACKET, SOCK_RAW, 0);
         if (rx->fd < 0) {
@@ -1161,7 +1164,50 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
                      netdev_get_name(netdev_), ovs_strerror(error));
             goto error;
         }
+
+        /* Set send socket buffer size */
+        error = setsockopt(rx->fd, SOL_SOCKET, SO_SNDBUF, &sock_buf_size, 4);
+        if (error) {
+            error = errno;
+            VLOG_ERR("%s: failed to set send socket buffer size (%s)",
+                                  netdev_get_name(netdev_), ovs_strerror(error));
+            goto error;
+        }
+
+        /* Set recv socket buffer size */
+        error = setsockopt(rx->fd, SOL_SOCKET, SO_RCVBUF, &sock_buf_size, 4);
+        if (error) {
+            error = errno;
+            VLOG_ERR("%s: failed to set recv socket buffer size (%s)",
+                                  netdev_get_name(netdev_), ovs_strerror(error));
+            goto error;
+        }
+
+        /* Get final recv socket buffer size, it should be
+         * 2 * ((1 << 30) - 1) (i.e. 2147483646) if successfully.
+         * Don't doubt it is wrong, Linux kernel does so, i.e.
+         * final sk_rcvbuf = val * 2.
+         */
+        error=  getsockopt(rx->fd, SOL_SOCKET, SO_RCVBUF, &sock_buf_size,
+                                                    &sock_opt_len);
+        if (!error) {
+            VLOG_INFO("netdev %s socket recv buffer size: %d",
+                                   netdev_get_name(netdev_), sock_buf_size);
+            }
+
+        /* Get final send socket buffer size, it should be
+         * 2 * ((1 << 30) - 1) (i.e. 2147483646) if successfully.
+         * Don't doubt it is wrong, Linux kernel does so, i.e.
+         * final sk_sndbuf = val * 2.
+         */
+        error = getsockopt(rx->fd, SOL_SOCKET, SO_SNDBUF, &sock_buf_size,
+                                                                    &sock_opt_len);
+        if (!error) {
+           VLOG_INFO("netdev %s socket send buffer size: %d",
+                                 netdev_get_name(netdev_), sock_buf_size);
+        }
     }
+
     ovs_mutex_unlock(&netdev->mutex);
 
     return 0;
