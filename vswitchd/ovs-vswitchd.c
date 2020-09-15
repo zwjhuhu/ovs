@@ -140,7 +140,9 @@ main(int argc, char *argv[])
             exiting = true;
         }
     }
-    bridge_exit(cleanup);
+    if (cleanup) {
+        bridge_exit(cleanup);
+    }
     unixctl_server_destroy(unixctl);
     service_stop();
     vlog_disable_async();
